@@ -1,0 +1,47 @@
+{
+  "name": "easy-psql-rbac",
+  "version": "1.0.0",
+  "description": "Role-based access control layer for easy-psql",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "build:watch": "tsc --project tsconfig.json --watch",
+    "test": "jest",
+    "prepublishOnly": "npm test && npm run build"
+  },
+  "keywords": [
+    "rbac",
+    "postgres",
+    "easy-psql",
+    "authorization",
+    "permissions"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "easy-validation-service": "^1.0.8"
+  },
+  "peerDependencies": {
+    "easy-psql": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.0.0",
+    "easy-psql": "^1.0.8",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "typescript": "^5.9.3"
+  }
+}
