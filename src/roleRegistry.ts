@@ -41,6 +41,7 @@ export class RoleConfig {
       this.options.permissions.entities[schema][table] = {} as any;
     }
     this.options.permissions.entities[schema][table][accessType] = input;
+
     return this;
   }
 

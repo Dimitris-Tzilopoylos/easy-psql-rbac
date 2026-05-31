@@ -161,6 +161,12 @@ export class EasyPSQLRBAC extends RoleRegistry {
     user?: User;
     entityPermissions: EntityPermissions;
   }) {
+    if (!ValidationService.isObject(input)) {
+      throw new BadRequest(
+        `query must be an object for operation ${apiAccessType}`,
+      );
+    }
+
     const { columns, ownership, preConditions } = entityPermissions;
 
     if (!Array.isArray(columns) || !columns.length) {
@@ -170,19 +176,14 @@ export class EasyPSQLRBAC extends RoleRegistry {
     }
 
     if (
-      ValidationService.isObject(input?.select) &&
+      ValidationService.isObject(input.select) &&
       Object.keys(input.select).length > 0
     ) {
-      input.select = Object.entries(input.select).reduce(
-        (acc: any, [key, value]: any) => {
-          if (!value || !columns.some((col) => col === key)) {
-            return acc;
-          }
-          acc[key] = true;
-          return acc;
-        },
-        {},
-      );
+      for (const key of Object.keys(input.select)) {
+        if (!input.select[key] || !columns.includes(key)) {
+          delete input.select[key];
+        }
+      }
     } else {
       input.select = (columns || []).reduce((acc: any, col: any) => {
         acc[col] = true;
@@ -310,10 +311,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
     const include = input.include || {};
     const iter: any = Object.entries(include);
     for (let [alias, relationConfig] of iter) {
-      if (
-        ValidationService.isBoolean(relationConfig) ||
-        ValidationService.isString(relationConfig)
-      ) {
+      if (!ValidationService.isObject(relationConfig)) {
         include[alias] = {};
         relationConfig = include[alias];
       }
@@ -477,10 +475,21 @@ export class EasyPSQLRBAC extends RoleRegistry {
       return acc;
     }, {});
 
+    if (input == null) {
+      throw new BadRequest(
+        `body must not be null for operation ${apiAccessType}`,
+      );
+    }
+
     const iter = Array.isArray(input) ? input : [input];
 
     for (let i = 0; i < iter.length; i++) {
-      Object.assign(iter[i], preConditions?.input);
+      if (!ValidationService.isObject(iter[i])) {
+        throw new BadRequest(
+          `each row must be an object for operation ${apiAccessType}`,
+        );
+      }
+      Object.assign(iter[i], this.fastDeepClone(preConditions?.input));
       let entry = iter[i];
       const entryPropsIter = Object.keys(entry);
       for (const key of entryPropsIter) {
@@ -548,7 +557,15 @@ export class EasyPSQLRBAC extends RoleRegistry {
       throw new ForbiddenError();
     }
 
-    input.update = { ...input.update, ...preConditions?.input };
+    if (!ValidationService.isObject(input?.update)) {
+      throw new BadRequest(
+        `input.update must be an object for operation ${apiAccessType}`,
+      );
+    }
+
+    if (preConditions?.input) {
+      Object.assign(input.update, this.fastDeepClone(preConditions.input));
+    }
 
     for (const column of Object.keys(input.update)) {
       if (!columns.some((x: string) => x === column)) {
@@ -659,8 +676,8 @@ export class EasyPSQLRBAC extends RoleRegistry {
 
         if (
           !relation ||
-          !entityPermissions.columns.some(
-            (col: string) => col === relation.from_column,
+          !entityPermissions.columns.some((col: string) =>
+            this.isColumnInRelationColumns({ relation, column: col }),
           )
         ) {
           throw new ForbiddenError();
@@ -679,11 +696,18 @@ export class EasyPSQLRBAC extends RoleRegistry {
         if (!relatedEntityPermissions.columns?.length) {
           throw new ForbiddenError();
         }
-        const [_, config]: any = Object.entries(value)?.[0] || [null, {}];
+        const valueEntries = ValidationService.isObject(value)
+          ? Object.entries(value)
+          : [];
+        const [_, config]: any = valueEntries[0] || [null, {}];
 
-        const [aggregationKey, aggregationConfig]: any = Object.entries(
-          config,
-        )?.[0] || ["", {}];
+        const configEntries = ValidationService.isObject(config)
+          ? Object.entries(config)
+          : [];
+        const [aggregationKey, aggregationConfig]: any = configEntries[0] || [
+          "",
+          {},
+        ];
 
         if (!aggregationKey) {
           throw new BadRequest();
@@ -704,8 +728,8 @@ export class EasyPSQLRBAC extends RoleRegistry {
         const relation = model.relations[key];
         if (
           !relation ||
-          !entityPermissions.columns.some(
-            (col: string) => col === relation.from_column,
+          !entityPermissions.columns.some((col: string) =>
+            this.isColumnInRelationColumns({ relation, column: col }),
           )
         ) {
           throw new ForbiddenError();
@@ -812,6 +836,27 @@ export class EasyPSQLRBAC extends RoleRegistry {
     }
   }
 
+  fastDeepClone<T = any>(obj: T): T {
+    if (obj === null || typeof obj !== "object") {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      const copy = new Array(obj.length);
+      for (let i = 0; i < obj.length; i++) {
+        copy[i] = this.fastDeepClone(obj[i]);
+      }
+      return copy as unknown as T;
+    }
+
+    const copy = {} as any;
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        copy[key] = this.fastDeepClone((obj as any)[key]);
+      }
+    }
+    return copy as T;
+  }
+
   mergeWhereWithPreConditions({
     where,
     preConditions,
@@ -826,7 +871,8 @@ export class EasyPSQLRBAC extends RoleRegistry {
     const conditionsToMerge = preConditions?.where;
 
     if (ValidationService.isObject(conditionsToMerge)) {
-      const { _and, _or, ...rest } = conditionsToMerge;
+      const conditions = this.fastDeepClone(conditionsToMerge);
+      const { _and, _or, ...rest } = conditions;
       where = { ...where, ...rest };
       if (Array.isArray(_and)) {
         where._and = [...(where._and || []), ..._and];
@@ -979,16 +1025,14 @@ export class EasyPSQLRBAC extends RoleRegistry {
     table,
     connection,
     bypass,
-    body,
-    query,
+    input,
     user,
   }: {
     schema: string;
     table: string;
     connection?: any;
     bypass?: boolean;
-    body: any;
-    query?: any;
+    input: { update: any; where?: any };
     user?: User;
   }) {
     const model = this.roleBasedModel({
@@ -997,8 +1041,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
       connection,
       apiAccessType: AllowedEngineApiAccessTypes.updateMany,
       bypass,
-      //might needs only query not
-      input: { update: body, where: query?.where },
+      input,
       user,
     });
     return model;
@@ -1009,16 +1052,14 @@ export class EasyPSQLRBAC extends RoleRegistry {
     table,
     connection,
     bypass,
-    body,
-    query,
+    input,
     user,
   }: {
     schema: string;
     table: string;
     connection?: any;
     bypass?: boolean;
-    body: any;
-    query?: any;
+    input: { update: any; where?: any };
     user?: User;
   }) {
     const model = this.roleBasedModel({
@@ -1027,7 +1068,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
       connection,
       apiAccessType: AllowedEngineApiAccessTypes.updateOne,
       bypass,
-      input: { update: body, where: query?.where },
+      input,
       user,
     });
     return model;
@@ -1038,14 +1079,14 @@ export class EasyPSQLRBAC extends RoleRegistry {
     table,
     connection,
     bypass,
-    query,
+    input,
     user,
   }: {
     schema: string;
     table: string;
     connection?: any;
     bypass?: boolean;
-    query?: any;
+    input: { where?: any };
     user?: User;
   }) {
     const model = this.roleBasedModel({
@@ -1054,7 +1095,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
       connection,
       apiAccessType: AllowedEngineApiAccessTypes.deleteMany,
       bypass,
-      input: { where: query?.where },
+      input,
       user,
     });
     return model;
@@ -1065,14 +1106,14 @@ export class EasyPSQLRBAC extends RoleRegistry {
     table,
     connection,
     bypass,
-    query,
+    input,
     user,
   }: {
     schema: string;
     table: string;
     connection?: any;
     bypass?: boolean;
-    query?: any;
+    input: { where?: any };
     user?: User;
   }) {
     const model = this.roleBasedModel({
@@ -1081,7 +1122,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
       connection,
       apiAccessType: AllowedEngineApiAccessTypes.deleteOne,
       bypass,
-      input: { where: query?.where },
+      input,
       user,
     });
     return model;
