@@ -2,7 +2,6 @@ import { BadRequest } from "./badrequest";
 import { ForbiddenError } from "./forbidden";
 import {
   AllowedEngineApiAccessTypes,
-  AtLeastOne,
   EntityPermissions,
   Model,
   RBACOptions,
@@ -65,23 +64,13 @@ export class EasyPSQLRBAC extends RoleRegistry {
     if (bypass) {
       return this.model({ schema, table, connection });
     }
-    const role = user?.role;
-    if (!role) {
-      throw new ForbiddenError("Access to this resource is forbidden");
-    }
 
     const entityPermissions = this.getRolePermissions(user?.roleId)
       .schema(schema)
       .table(table)
       [apiAccessType]();
 
-    if (!entityPermissions) {
-      throw new ForbiddenError(
-        `${schema}.${table}: operation ${apiAccessType}  is not allowed`,
-      );
-    }
-
-    const { columns = [] } = entityPermissions || {};
+    const { columns = [] } = entityPermissions;
 
     if (!columns?.length) {
       throw new ForbiddenError(
@@ -150,7 +139,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
   }: {
     schema: string;
     table: string;
-    user: User;
+    user?: User;
     apiAccessType: AllowedEngineApiAccessTypes;
   }): EntityPermissions {
     return this.getRolePermissions(user?.roleId)
@@ -169,30 +158,19 @@ export class EasyPSQLRBAC extends RoleRegistry {
     model: Model;
     input: any;
     apiAccessType: AllowedEngineApiAccessTypes;
-    user: User;
+    user?: User;
     entityPermissions: EntityPermissions;
   }) {
-    const role = user?.role;
-    if (!role) {
-      throw new ForbiddenError("Access to this resource is forbidden");
-    }
-
-    if (!entityPermissions) {
-      throw new ForbiddenError(
-        `${model.schema}.${model.table}: operation ${apiAccessType}  is not allowed`,
-      );
-    }
-
     const { columns, ownership, preConditions } = entityPermissions;
 
     if (!Array.isArray(columns) || !columns.length) {
       throw new ForbiddenError(
-        `${model.schema}.${model.table}: operation ${apiAccessType}   is not allowed`,
+        `${model.schema}.${model.table}: operation ${apiAccessType} is not allowed`,
       );
     }
 
     if (
-      ValidationService.isObject(input.select) &&
+      ValidationService.isObject(input?.select) &&
       Object.keys(input.select).length > 0
     ) {
       input.select = Object.entries(input.select).reduce(
@@ -237,17 +215,14 @@ export class EasyPSQLRBAC extends RoleRegistry {
           }
           const relatedEntityPermissions = this.getUserRolePermissionsForEntity(
             {
-              schema: relatedModel.schema ?? "",
+              schema: relatedModel.schema || DB.database,
               table: relatedModel.table,
-              user: { role },
+              user,
               apiAccessType,
             },
           );
 
-          if (
-            !relatedEntityPermissions ||
-            !relatedEntityPermissions?.columns?.length
-          ) {
+          if (!relatedEntityPermissions.columns?.length) {
             throw new ForbiddenError(
               `${relatedModel.schema}.${relatedModel.table}: operation ${apiAccessType} is not allowed`,
             );
@@ -309,7 +284,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
           `${model.schema}.${model.table}: operation ${apiAccessType} is not allowed`,
         );
       }
-      if (!ownership?.columns.some((x: string) => columns.includes(x))) {
+      if (!ownership?.columns.every((x: string) => columns.includes(x))) {
         throw new ForbiddenError(
           `${model.schema}.${model.table}: operation ${apiAccessType} is not allowed`,
         );
@@ -365,16 +340,13 @@ export class EasyPSQLRBAC extends RoleRegistry {
           );
         }
         const relatedEntityPermissions = this.getUserRolePermissionsForEntity({
-          schema: relatedModel.schema ?? "",
+          schema: relatedModel.schema || DB.database,
           table: relatedModel.table,
           user,
           apiAccessType,
         });
 
-        if (
-          !relatedEntityPermissions ||
-          !relatedEntityPermissions?.columns?.length
-        ) {
+        if (!relatedEntityPermissions.columns?.length) {
           throw new ForbiddenError(
             `${relatedModel.schema}.${relatedModel.table}: aggregate operation ${apiAccessType} is not allowed`,
           );
@@ -429,17 +401,11 @@ export class EasyPSQLRBAC extends RoleRegistry {
         throw new ForbiddenError(`operation ${apiAccessType} is not allowed`);
       }
       const relatedEntityPermissions = this.getUserRolePermissionsForEntity({
-        schema: relatedModel.schema ?? "",
+        schema: relatedModel.schema || DB.database,
         table: relatedModel.table,
         user,
         apiAccessType,
       });
-
-      if (!relatedEntityPermissions) {
-        throw new ForbiddenError(
-          `${relatedModel.schema}.${relatedModel.table}: operation ${apiAccessType} is not allowed`,
-        );
-      }
 
       this.roleBasedSelectSanitization({
         user,
@@ -497,13 +463,9 @@ export class EasyPSQLRBAC extends RoleRegistry {
     model: Model;
     input: any;
     apiAccessType: AllowedEngineApiAccessTypes;
-    user: User;
+    user?: User;
     entityPermissions: EntityPermissions;
   }) {
-    if (!entityPermissions) {
-      throw new ForbiddenError();
-    }
-
     const { columns, ownership, preConditions } = entityPermissions;
 
     if (!Array.isArray(columns) || !columns.length) {
@@ -528,7 +490,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
           const relatedModel = DB.getRelatedModel(model.relations[key]);
           const relatedModelEntityPermissions =
             this.getUserRolePermissionsForEntity({
-              schema: relatedModel.schema,
+              schema: relatedModel.schema || DB.database,
               table: relatedModel.table,
               user,
               apiAccessType,
@@ -542,7 +504,9 @@ export class EasyPSQLRBAC extends RoleRegistry {
           });
         } else {
           if (!allowedColumnsMap[key]) {
-            delete entry[key];
+            throw new ForbiddenError(
+              `column ${key} is not allowed for operation ${apiAccessType}`,
+            );
           }
         }
       }
@@ -555,7 +519,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
         if (!user) {
           throw new ForbiddenError();
         }
-        if (!ownership?.columns.some((x: string) => allowedColumnsMap[x])) {
+        if (!ownership?.columns.every((x: string) => allowedColumnsMap[x])) {
           throw new ForbiddenError();
         }
         for (const col of ownership.columns) {
@@ -575,13 +539,9 @@ export class EasyPSQLRBAC extends RoleRegistry {
     model: Model;
     input: any;
     apiAccessType: AllowedEngineApiAccessTypes;
-    user: User;
+    user?: User;
     entityPermissions: EntityPermissions;
   }) {
-    if (!entityPermissions) {
-      throw new ForbiddenError();
-    }
-
     const { columns, ownership, preConditions } = entityPermissions;
 
     if (!Array.isArray(columns) || !columns.length) {
@@ -590,15 +550,12 @@ export class EasyPSQLRBAC extends RoleRegistry {
 
     input.update = { ...input.update, ...preConditions?.input };
 
-    const iter = Object.keys(input.update);
-    for (const column of iter) {
+    for (const column of Object.keys(input.update)) {
       if (!columns.some((x: string) => x === column)) {
-        delete input.update[column];
+        throw new ForbiddenError(
+          `column ${column} is not allowed for operation ${apiAccessType}`,
+        );
       }
-    }
-
-    if (!Object.keys(input.update).length) {
-      throw new ForbiddenError();
     }
     if (!input.where) {
       input.where = {};
@@ -624,7 +581,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
       if (!user) {
         throw new ForbiddenError();
       }
-      if (!ownership?.columns.some((x: string) => columns.includes(x))) {
+      if (!ownership?.columns.every((x: string) => columns.includes(x))) {
         throw new ForbiddenError();
       }
       if (!ValidationService.isObject(input.where)) {
@@ -655,7 +612,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
     model: Model;
     where: any;
     apiAccessType: AllowedEngineApiAccessTypes;
-    user: User;
+    user?: User;
     entityPermissions: EntityPermissions;
   }) {
     if (
@@ -713,16 +670,13 @@ export class EasyPSQLRBAC extends RoleRegistry {
           throw new ForbiddenError();
         }
         const relatedEntityPermissions = this.getUserRolePermissionsForEntity({
-          schema: relatedModel.schema!,
+          schema: relatedModel.schema || DB.database,
           table: relatedModel.table,
           user,
           apiAccessType,
         });
 
-        if (
-          !relatedEntityPermissions ||
-          !relatedEntityPermissions?.columns?.length
-        ) {
+        if (!relatedEntityPermissions.columns?.length) {
           throw new ForbiddenError();
         }
         const [_, config]: any = Object.entries(value)?.[0] || [null, {}];
@@ -761,15 +715,11 @@ export class EasyPSQLRBAC extends RoleRegistry {
           throw new ForbiddenError();
         }
         const relatedEntityPermissions = this.getUserRolePermissionsForEntity({
-          schema: relatedModel.schema!,
+          schema: relatedModel.schema || DB.database,
           table: relatedModel.table,
           user,
           apiAccessType,
         });
-
-        if (!relatedEntityPermissions) {
-          throw new ForbiddenError();
-        }
 
         where[key] = this.mergeWhereWithPreConditions({
           where: value || {},
@@ -796,15 +746,10 @@ export class EasyPSQLRBAC extends RoleRegistry {
   }: {
     model: Model;
     input: any;
-    role?: any;
     apiAccessType: AllowedEngineApiAccessTypes;
-    user: User;
+    user?: User;
     entityPermissions: EntityPermissions;
   }) {
-    if (!entityPermissions) {
-      throw new ForbiddenError();
-    }
-
     const { columns, ownership, preConditions } = entityPermissions;
 
     if (!Array.isArray(columns) || !columns.length) {
@@ -837,9 +782,6 @@ export class EasyPSQLRBAC extends RoleRegistry {
       }
       if (!ownership.columns.every((x: string) => columns.includes(x))) {
         throw new ForbiddenError();
-      }
-      if (!ValidationService.isObject(input.where)) {
-        input.where = {};
       }
 
       input.where = {
@@ -1147,30 +1089,5 @@ export class EasyPSQLRBAC extends RoleRegistry {
 
   private toUserOwnershipColumn(user: User) {
     return user?.[this.options.userIdentityKey || "id"];
-  }
-
-  allowedApiAccessTypeToWebhookEvent(
-    apiAccessType: AllowedEngineApiAccessTypes,
-  ) {
-    return {
-      [AllowedEngineApiAccessTypes.findMany]:
-        AllowedEngineApiAccessTypes.findMany,
-      [AllowedEngineApiAccessTypes.findOne]:
-        AllowedEngineApiAccessTypes.findOne,
-      [AllowedEngineApiAccessTypes.aggregate]:
-        AllowedEngineApiAccessTypes.aggregate,
-      [AllowedEngineApiAccessTypes.createMany]:
-        AllowedEngineApiAccessTypes.createMany,
-      [AllowedEngineApiAccessTypes.createOne]:
-        AllowedEngineApiAccessTypes.createOne,
-      [AllowedEngineApiAccessTypes.updateMany]:
-        AllowedEngineApiAccessTypes.updateMany,
-      [AllowedEngineApiAccessTypes.updateOne]:
-        AllowedEngineApiAccessTypes.updateOne,
-      [AllowedEngineApiAccessTypes.deleteMany]:
-        AllowedEngineApiAccessTypes.deleteMany,
-      [AllowedEngineApiAccessTypes.deleteOne]:
-        AllowedEngineApiAccessTypes.deleteOne,
-    }[apiAccessType];
   }
 }

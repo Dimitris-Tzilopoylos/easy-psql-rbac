@@ -28,13 +28,19 @@ export class RoleConfig {
     accessType: AllowedEngineApiAccessTypes,
     input: EntityPermissions,
   ) {
-    if (!("permissions" in this.options)) {
-      this.options.permissions = {};
-      if (!("entities" in this.options.permissions)) {
-        this.options.permissions.entities = {};
-      }
+    if (!this.options.permissions) {
+      this.options.permissions = { entities: {} };
     }
-    this.options.permissions!.entities![schema][table][accessType] = input;
+    if (!this.options.permissions.entities) {
+      this.options.permissions.entities = {};
+    }
+    if (!this.options.permissions.entities[schema]) {
+      this.options.permissions.entities[schema] = {};
+    }
+    if (!this.options.permissions.entities[schema][table]) {
+      this.options.permissions.entities[schema][table] = {} as any;
+    }
+    this.options.permissions.entities[schema][table][accessType] = input;
     return this;
   }
 
@@ -128,6 +134,9 @@ export class RoleConfig {
   schema(s: string) {
     this.assertPermissionEntities();
     const _schema = this.options.permissions!.entities![s];
+    if (!_schema) {
+      throw new ForbiddenError();
+    }
     return {
       table: (t: string) => {
         if (!(t in _schema)) {
@@ -143,7 +152,6 @@ export class RoleConfig {
             ) {
               throw new ForbiddenError();
             }
-
             return config!;
           },
           [AllowedEngineApiAccessTypes.findOne]: () => {
@@ -154,7 +162,6 @@ export class RoleConfig {
             ) {
               throw new ForbiddenError();
             }
-
             return config!;
           },
           [AllowedEngineApiAccessTypes.aggregate]: () => {
@@ -165,7 +172,6 @@ export class RoleConfig {
             ) {
               throw new ForbiddenError();
             }
-
             return config!;
           },
           [AllowedEngineApiAccessTypes.createMany]: () => {
@@ -176,7 +182,6 @@ export class RoleConfig {
             ) {
               throw new ForbiddenError();
             }
-
             return config!;
           },
           [AllowedEngineApiAccessTypes.createOne]: () => {
@@ -187,18 +192,16 @@ export class RoleConfig {
             ) {
               throw new ForbiddenError();
             }
-
             return config!;
           },
           [AllowedEngineApiAccessTypes.updateMany]: () => {
-            const config = _table[AllowedEngineApiAccessTypes.findMany];
+            const config = _table[AllowedEngineApiAccessTypes.updateMany];
             if (
               !ValidationService.isObject(config) ||
               Object.keys(config || {}).length === 0
             ) {
               throw new ForbiddenError();
             }
-
             return config!;
           },
           [AllowedEngineApiAccessTypes.updateOne]: () => {
@@ -209,7 +212,6 @@ export class RoleConfig {
             ) {
               throw new ForbiddenError();
             }
-
             return config!;
           },
           [AllowedEngineApiAccessTypes.deleteMany]: () => {
@@ -220,7 +222,6 @@ export class RoleConfig {
             ) {
               throw new ForbiddenError();
             }
-
             return config!;
           },
           [AllowedEngineApiAccessTypes.deleteOne]: () => {
@@ -231,7 +232,6 @@ export class RoleConfig {
             ) {
               throw new ForbiddenError();
             }
-
             return config!;
           },
         };
