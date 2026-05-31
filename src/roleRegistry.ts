@@ -4,6 +4,7 @@ import {
   EntityPermissions,
   RoleConfigConstructor,
 } from "./types";
+import { ForbiddenError } from "./forbidden";
 
 export class RoleConfig {
   options: RoleConfigConstructor;
@@ -117,6 +118,126 @@ export class RoleConfig {
       input,
     );
   }
+
+  assertPermissionEntities() {
+    if (!this.options?.permissions?.entities) {
+      throw new ForbiddenError();
+    }
+  }
+
+  schema(s: string) {
+    this.assertPermissionEntities();
+    const _schema = this.options.permissions!.entities![s];
+    return {
+      table: (t: string) => {
+        if (!(t in _schema)) {
+          throw new ForbiddenError();
+        }
+        const _table = _schema[t];
+        return {
+          [AllowedEngineApiAccessTypes.findMany]: () => {
+            const config = _table[AllowedEngineApiAccessTypes.findMany];
+            if (
+              !ValidationService.isObject(config) ||
+              Object.keys(config || {}).length === 0
+            ) {
+              throw new ForbiddenError();
+            }
+
+            return config!;
+          },
+          [AllowedEngineApiAccessTypes.findOne]: () => {
+            const config = _table[AllowedEngineApiAccessTypes.findOne];
+            if (
+              !ValidationService.isObject(config) ||
+              Object.keys(config || {}).length === 0
+            ) {
+              throw new ForbiddenError();
+            }
+
+            return config!;
+          },
+          [AllowedEngineApiAccessTypes.aggregate]: () => {
+            const config = _table[AllowedEngineApiAccessTypes.aggregate];
+            if (
+              !ValidationService.isObject(config) ||
+              Object.keys(config || {}).length === 0
+            ) {
+              throw new ForbiddenError();
+            }
+
+            return config!;
+          },
+          [AllowedEngineApiAccessTypes.createMany]: () => {
+            const config = _table[AllowedEngineApiAccessTypes.createMany];
+            if (
+              !ValidationService.isObject(config) ||
+              Object.keys(config || {}).length === 0
+            ) {
+              throw new ForbiddenError();
+            }
+
+            return config!;
+          },
+          [AllowedEngineApiAccessTypes.createOne]: () => {
+            const config = _table[AllowedEngineApiAccessTypes.createOne];
+            if (
+              !ValidationService.isObject(config) ||
+              Object.keys(config || {}).length === 0
+            ) {
+              throw new ForbiddenError();
+            }
+
+            return config!;
+          },
+          [AllowedEngineApiAccessTypes.updateMany]: () => {
+            const config = _table[AllowedEngineApiAccessTypes.findMany];
+            if (
+              !ValidationService.isObject(config) ||
+              Object.keys(config || {}).length === 0
+            ) {
+              throw new ForbiddenError();
+            }
+
+            return config!;
+          },
+          [AllowedEngineApiAccessTypes.updateOne]: () => {
+            const config = _table[AllowedEngineApiAccessTypes.updateOne];
+            if (
+              !ValidationService.isObject(config) ||
+              Object.keys(config || {}).length === 0
+            ) {
+              throw new ForbiddenError();
+            }
+
+            return config!;
+          },
+          [AllowedEngineApiAccessTypes.deleteMany]: () => {
+            const config = _table[AllowedEngineApiAccessTypes.deleteMany];
+            if (
+              !ValidationService.isObject(config) ||
+              Object.keys(config || {}).length === 0
+            ) {
+              throw new ForbiddenError();
+            }
+
+            return config!;
+          },
+          [AllowedEngineApiAccessTypes.deleteOne]: () => {
+            const config = _table[AllowedEngineApiAccessTypes.deleteOne];
+            if (
+              !ValidationService.isObject(config) ||
+              Object.keys(config || {}).length === 0
+            ) {
+              throw new ForbiddenError();
+            }
+
+            return config!;
+          },
+        };
+      },
+    };
+  }
 }
 
 export const roleFactory = (id: any) =>
@@ -144,6 +265,14 @@ export class RoleRegistry {
 
   findRoleById(id: any) {
     return this._registry.get(id);
+  }
+
+  getRolePermissions(roleId: any) {
+    const role = this.findRoleById(roleId);
+    if (!role) {
+      throw new ForbiddenError();
+    }
+    return role;
   }
 }
 

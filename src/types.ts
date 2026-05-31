@@ -44,7 +44,7 @@ export interface Role extends Record<string, any> {
 }
 
 export interface User extends Record<string, any> {
-  role?: Role;
+  roleId?: Role;
 }
 
 export interface RBACOptions {
