@@ -1540,6 +1540,245 @@ describe("RoleRegistry", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 11b. RoleRegistry.clear
+// ---------------------------------------------------------------------------
+
+describe("RoleRegistry.clear", () => {
+  it("makes a previously registered role unfindable", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.withRole("editor", (r) =>
+      r.findMany("public", "users", { columns: ["id"] }),
+    );
+    expect(rbac.findRoleById("editor")).toBeDefined();
+    rbac.clear();
+    expect(rbac.findRoleById("editor")).toBeUndefined();
+  });
+
+  it("makes getRolePermissions throw ForbiddenError after clearing", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.withRole("editor", (r) =>
+      r.findMany("public", "users", { columns: ["id"] }),
+    );
+    rbac.clear();
+    expect(() => rbac.getRolePermissions("editor")).toThrow(ForbiddenError);
+  });
+
+  it("does not throw when called on an already empty registry", () => {
+    const rbac = new EasyPSQLRBAC();
+    expect(() => rbac.clear()).not.toThrow();
+  });
+
+  it("allows new roles to be added after clearing", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.withRole("admin", (r) =>
+      r.findMany("public", "users", { columns: ["id"] }),
+    );
+    rbac.clear();
+    rbac.withRole("viewer", (r) =>
+      r.findMany("public", "users", { columns: ["id"] }),
+    );
+    expect(rbac.findRoleById("admin")).toBeUndefined();
+    expect(rbac.findRoleById("viewer")).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 11c. RoleRegistry.bulkInit
+// ---------------------------------------------------------------------------
+
+describe("RoleRegistry.bulkInit", () => {
+  it("registers a role with findMany permissions", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.bulkInit({
+      public: {
+        users: {
+          id: "viewer",
+          permissions: {
+            [AllowedEngineApiAccessTypes.findMany]: { columns: ["id", "name"] },
+          },
+        },
+      },
+    });
+    const role = rbac.findRoleById("viewer");
+    expect(role).toBeDefined();
+    expect(
+      role!.options.permissions!.entities!["public"]["users"]["findMany"],
+    ).toEqual({ columns: ["id", "name"] });
+  });
+
+  it("registers all supported access types", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.bulkInit({
+      public: {
+        users: {
+          id: "all-access",
+          permissions: {
+            [AllowedEngineApiAccessTypes.findMany]: { columns: ["id"] },
+            [AllowedEngineApiAccessTypes.findOne]: { columns: ["id"] },
+            [AllowedEngineApiAccessTypes.aggregate]: { columns: ["id"] },
+            [AllowedEngineApiAccessTypes.createOne]: { columns: ["name"] },
+            [AllowedEngineApiAccessTypes.createMany]: { columns: ["name"] },
+            [AllowedEngineApiAccessTypes.updateOne]: { columns: ["name"] },
+            [AllowedEngineApiAccessTypes.updateMany]: { columns: ["name"] },
+            [AllowedEngineApiAccessTypes.deleteOne]: { columns: ["id"] },
+            [AllowedEngineApiAccessTypes.deleteMany]: { columns: ["id"] },
+          },
+        },
+      },
+    });
+    const role = rbac.findRoleById("all-access")!;
+    const perms = role.options.permissions!.entities!["public"]["users"];
+    expect(perms["findMany"]).toEqual({ columns: ["id"] });
+    expect(perms["findOne"]).toEqual({ columns: ["id"] });
+    expect(perms["aggregate"]).toEqual({ columns: ["id"] });
+    expect(perms["createOne"]).toEqual({ columns: ["name"] });
+    expect(perms["createMany"]).toEqual({ columns: ["name"] });
+    expect(perms["updateOne"]).toEqual({ columns: ["name"] });
+    expect(perms["updateMany"]).toEqual({ columns: ["name"] });
+    expect(perms["deleteOne"]).toEqual({ columns: ["id"] });
+    expect(perms["deleteMany"]).toEqual({ columns: ["id"] });
+  });
+
+  it("registers distinct roles for different role ids across tables", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.bulkInit({
+      public: {
+        users: {
+          id: "role-a",
+          permissions: {
+            [AllowedEngineApiAccessTypes.findMany]: { columns: ["id"] },
+          },
+        },
+        posts: {
+          id: "role-b",
+          permissions: {
+            [AllowedEngineApiAccessTypes.findMany]: { columns: ["id"] },
+          },
+        },
+      },
+    });
+    expect(rbac.findRoleById("role-a")).toBeDefined();
+    expect(rbac.findRoleById("role-b")).toBeDefined();
+  });
+
+  it("preserves pre-existing roles when clear is not passed", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.withRole("pre-existing", (r) =>
+      r.findMany("public", "users", { columns: ["id"] }),
+    );
+    rbac.bulkInit({
+      public: {
+        users: {
+          id: "new-role",
+          permissions: {
+            [AllowedEngineApiAccessTypes.findMany]: { columns: ["id"] },
+          },
+        },
+      },
+    });
+    expect(rbac.findRoleById("pre-existing")).toBeDefined();
+    expect(rbac.findRoleById("new-role")).toBeDefined();
+  });
+
+  it("clears pre-existing roles when clear is true", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.withRole("pre-existing", (r) =>
+      r.findMany("public", "users", { columns: ["id"] }),
+    );
+    rbac.bulkInit(
+      {
+        public: {
+          users: {
+            id: "new-role",
+            permissions: {
+              [AllowedEngineApiAccessTypes.findMany]: { columns: ["id"] },
+            },
+          },
+        },
+      },
+      true,
+    );
+    expect(rbac.findRoleById("pre-existing")).toBeUndefined();
+    expect(rbac.findRoleById("new-role")).toBeDefined();
+  });
+
+  it("preserves pre-existing roles when clear is false", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.withRole("pre-existing", (r) =>
+      r.findMany("public", "users", { columns: ["id"] }),
+    );
+    rbac.bulkInit(
+      {
+        public: {
+          users: {
+            id: "new-role",
+            permissions: {
+              [AllowedEngineApiAccessTypes.findMany]: { columns: ["id"] },
+            },
+          },
+        },
+      },
+      false,
+    );
+    expect(rbac.findRoleById("pre-existing")).toBeDefined();
+    expect(rbac.findRoleById("new-role")).toBeDefined();
+  });
+
+  it("does not throw when called with an empty roleConfigs object", () => {
+    const rbac = new EasyPSQLRBAC();
+    expect(() => rbac.bulkInit({})).not.toThrow();
+  });
+
+  it("registered role passes permission check for the correct access type", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.bulkInit({
+      public: {
+        users: {
+          id: "viewer",
+          permissions: {
+            [AllowedEngineApiAccessTypes.findMany]: {
+              columns: ["id", "name", "email", "user_id"],
+            },
+          },
+        },
+      },
+    });
+    expect(() =>
+      rbac.findManyModel({
+        schema: "public",
+        table: "users",
+        user: { id: "u1", role_id: "viewer" },
+        query: {},
+      }),
+    ).not.toThrow();
+  });
+
+  it("registered role throws ForbiddenError for an access type not in bulkInit permissions", () => {
+    const rbac = new EasyPSQLRBAC();
+    rbac.bulkInit({
+      public: {
+        users: {
+          id: "readonly",
+          permissions: {
+            [AllowedEngineApiAccessTypes.findMany]: {
+              columns: ["id", "name", "email", "user_id"],
+            },
+          },
+        },
+      },
+    });
+    expect(() =>
+      rbac.findOneModel({
+        schema: "public",
+        table: "users",
+        user: { id: "u1", role_id: "readonly" },
+        query: {},
+      }),
+    ).toThrow(ForbiddenError);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 12. Registry isolation — pollution prevention
 // ---------------------------------------------------------------------------
 

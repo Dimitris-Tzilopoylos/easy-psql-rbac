@@ -1,6 +1,7 @@
 import ValidationService from "easy-validation-service";
 import {
   AllowedEngineApiAccessTypes,
+  AtLeastOne,
   EntityPermissions,
   RoleConfigConstructor,
 } from "./types";
@@ -247,6 +248,73 @@ export const roleFactory = (id: any) =>
 export class RoleRegistry {
   private _registry: Map<string, RoleConfig> = new Map();
   constructor() {}
+
+  clear() {
+    this._registry = new Map<string, RoleConfig>();
+  }
+
+  bulkInit(
+    roleConfigs: Record<
+      string,
+      Record<
+        string,
+        {
+          id: string;
+          permissions: AtLeastOne<
+            Record<AllowedEngineApiAccessTypes, EntityPermissions>
+          >;
+        }
+      >
+    >,
+    clear?: boolean,
+  ) {
+    if (clear) {
+      this.clear();
+    }
+
+    Object.entries(roleConfigs).forEach(([schema, tableConfig]) => {
+      Object.entries(tableConfig).forEach(([table, roleConfig]) => {
+        const role = roleFactory(roleConfig.id);
+
+        Object.entries(roleConfig.permissions).forEach(
+          ([accessType, permissions]) => {
+            switch (accessType) {
+              case AllowedEngineApiAccessTypes.findMany:
+                role.findMany(schema, table, permissions);
+                break;
+              case AllowedEngineApiAccessTypes.findOne:
+                role.findOne(schema, table, permissions);
+                break;
+              case AllowedEngineApiAccessTypes.aggregate:
+                role.aggregate(schema, table, permissions);
+                break;
+              case AllowedEngineApiAccessTypes.createMany:
+                role.createMany(schema, table, permissions);
+                break;
+              case AllowedEngineApiAccessTypes.createOne:
+                role.createOne(schema, table, permissions);
+                break;
+              case AllowedEngineApiAccessTypes.updateMany:
+                role.updateMany(schema, table, permissions);
+                break;
+              case AllowedEngineApiAccessTypes.updateOne:
+                role.updateOne(schema, table, permissions);
+                break;
+              case AllowedEngineApiAccessTypes.deleteMany:
+                role.deleteMany(schema, table, permissions);
+                break;
+              case AllowedEngineApiAccessTypes.deleteOne:
+                role.deleteOne(schema, table, permissions);
+                break;
+              default:
+                break;
+            }
+          },
+        );
+        this.upsertRole(role);
+      });
+    });
+  }
 
   upsertRole(role: RoleConfig) {
     this._registry.set(role.options.id, role);
