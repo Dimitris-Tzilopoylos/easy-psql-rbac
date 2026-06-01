@@ -301,7 +301,11 @@ export class EasyPSQLRBAC extends RoleRegistry {
           }))
           .concat(
             ownership?.columns.map((col: string) => {
-              return { [col]: { _eq: this.toUserOwnershipColumn(user) } };
+              return this.toUserOwnershipColumnNameMapper(
+                user,
+                col,
+                ownership.columnToUserFieldMapper,
+              );
             }, {}),
           ),
       };
@@ -532,7 +536,15 @@ export class EasyPSQLRBAC extends RoleRegistry {
           throw new ForbiddenError();
         }
         for (const col of ownership.columns) {
-          entry[col] = this.toUserOwnershipColumn(user);
+          Object.assign(
+            entry,
+            this.toUserOwnershipColumnNameMapper(
+              user,
+              col,
+              ownership.columnToUserFieldMapper,
+              false,
+            ),
+          );
         }
       }
     }
@@ -612,7 +624,11 @@ export class EasyPSQLRBAC extends RoleRegistry {
           }))
           .concat(
             ownership?.columns.map((col: string) => {
-              return { [col]: { _eq: this.toUserOwnershipColumn(user) } };
+              return this.toUserOwnershipColumnNameMapper(
+                user,
+                col,
+                ownership.columnToUserFieldMapper,
+              );
             }, {}),
           ),
       };
@@ -815,7 +831,11 @@ export class EasyPSQLRBAC extends RoleRegistry {
           }))
           .concat(
             ownership.columns.map((col: string) => {
-              return { [col]: { _eq: this.toUserOwnershipColumn(user) } };
+              return this.toUserOwnershipColumnNameMapper(
+                user,
+                col,
+                ownership.columnToUserFieldMapper,
+              );
             }, {}),
           ),
       };
@@ -1128,7 +1148,21 @@ export class EasyPSQLRBAC extends RoleRegistry {
     return model;
   }
 
-  private toUserOwnershipColumn(user: User) {
+  private toUserOwnershipColumnValueDefault(user: User) {
     return user?.[this.options.userIdentityKey || "id"];
+  }
+
+  private toUserOwnershipColumnNameMapper(
+    user: User,
+    col: string,
+    columnToUserFieldMapper?: Record<string, string>,
+    isComparison: boolean = true,
+  ) {
+    const userField = columnToUserFieldMapper?.[col];
+    const value =
+      userField && user && userField in user
+        ? user[userField]
+        : this.toUserOwnershipColumnValueDefault(user);
+    return isComparison ? { [col]: { _eq: value } } : { [col]: value };
   }
 }

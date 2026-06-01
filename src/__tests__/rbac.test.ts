@@ -346,6 +346,27 @@ describe("select sanitization", () => {
     expect(query.where._and).toContainEqual({ user_id: { _eq: "user-123" } });
   });
 
+  it("uses columnToUserFieldMapper to resolve the user field for ownership WHERE", () => {
+    rbac.withRole("mapped-sel", (r) =>
+      r.findMany("public", "users", {
+        columns: ["id", "name", "email", "user_id"],
+        ownership: {
+          enabled: true,
+          columns: ["user_id"],
+          columnToUserFieldMapper: { user_id: "sub" },
+        },
+      }),
+    );
+    const query: any = {};
+    rbac.findManyModel({
+      schema: "public",
+      table: "users",
+      user: { id: "user-123", sub: "sub-abc", roleId: "mapped-sel" },
+      query,
+    });
+    expect(query.where._and).toContainEqual({ user_id: { _eq: "sub-abc" } });
+  });
+
   it("throws when ONE of multiple select-ownership columns is missing — every not some", () => {
     const query: any = {};
     expect(() =>
@@ -542,6 +563,28 @@ describe("insert sanitization", () => {
     });
     expect(body.user_id).toBe("user-123");
   });
+
+  it("uses columnToUserFieldMapper to set the correct value on insert", () => {
+    rbac.withRole("mapped-ins", (r) =>
+      r.createOne("public", "users", {
+        columns: ["name", "email", "user_id"],
+        ownership: {
+          enabled: true,
+          columns: ["user_id"],
+          columnToUserFieldMapper: { user_id: "sub" },
+        },
+      }),
+    );
+    const body: any = { name: "Alice", email: "a@b.com" };
+    rbac.createOneModel({
+      schema: "public",
+      table: "users",
+      user: { id: "user-123", sub: "sub-abc", roleId: "mapped-ins" },
+      body,
+    });
+    expect(body.user_id).toBe("sub-abc");
+  });
+
 
   it("throws ForbiddenError when any row in createMany contains a disallowed column", () => {
     const body: any = [
@@ -795,6 +838,25 @@ describe("update sanitization", () => {
       },
     });
     expect(input.where._and).toContainEqual({ user_id: { _eq: "user-123" } });
+  });
+
+  it("uses columnToUserFieldMapper to resolve the user field for update ownership WHERE", () => {
+    const input: any = { update: { name: "Bob" }, where: {} };
+    rbac.roleBasedUpdateSanitization({
+      model: (DB as any).models["public"]["users"],
+      input,
+      apiAccessType: AllowedEngineApiAccessTypes.updateOne,
+      user: { id: "user-123", sub: "sub-abc", roleId: ROLE.BASE },
+      entityPermissions: {
+        columns: ["name", "email", "user_id"],
+        ownership: {
+          enabled: true,
+          columns: ["user_id"],
+          columnToUserFieldMapper: { user_id: "sub" },
+        },
+      },
+    });
+    expect(input.where._and).toContainEqual({ user_id: { _eq: "sub-abc" } });
   });
 
   it("initialises input.where to {} when not provided", () => {
