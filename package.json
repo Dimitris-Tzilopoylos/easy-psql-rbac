@@ -29,7 +29,6 @@
     "authorization",
     "permissions",
     "access-control",
-    "row-level-security",
     "column-security",
     "orm",
     "typescript"
