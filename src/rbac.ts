@@ -65,7 +65,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
       return this.model({ schema, table, connection });
     }
 
-    const entityPermissions = this.getRolePermissions(user?.roleId)
+    const entityPermissions = this.getRolePermissions(user?.role_id)
       .schema(schema)
       .table(table)
       [apiAccessType]();
@@ -142,7 +142,7 @@ export class EasyPSQLRBAC extends RoleRegistry {
     user?: User;
     apiAccessType: AllowedEngineApiAccessTypes;
   }): EntityPermissions {
-    return this.getRolePermissions(user?.roleId)
+    return this.getRolePermissions(user?.role_id)
       .schema(schema)
       .table(table)
       [apiAccessType]();

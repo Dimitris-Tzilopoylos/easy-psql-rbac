@@ -25,7 +25,7 @@ const rbac = new EasyPSQLRBAC();
 rbac.withRole("viewer", (role) =>
   role
     .findMany("public", "posts", { columns: ["id", "title", "body"] })
-    .findOne("public", "posts",  { columns: ["id", "title", "body"] })
+    .findOne("public", "posts", { columns: ["id", "title", "body"] }),
 );
 
 rbac.withRole("author", (role) =>
@@ -44,11 +44,11 @@ rbac.withRole("author", (role) =>
     })
     .deleteOne("public", "posts", {
       ownership: { enabled: true, columns: ["author_id"] },
-    })
+    }),
 );
 
 // Use with a request
-const user = { id: "user-123", roleId: "author" };
+const user = { id: "user-123", role_id: "author" };
 
 const model = rbac.findManyModel({
   schema: "public",
@@ -98,9 +98,9 @@ preConditions: {
 
 ### `new EasyPSQLRBAC(options?)`
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `userIdentityKey` | `string` | `"id"` | Field on the user object used for ownership matching |
+| Option            | Type     | Default | Description                                          |
+| ----------------- | -------- | ------- | ---------------------------------------------------- |
+| `userIdentityKey` | `string` | `"id"`  | Field on the user object used for ownership matching |
 
 ```typescript
 const rbac = new EasyPSQLRBAC({ userIdentityKey: "userId" });
@@ -118,7 +118,7 @@ Registers or replaces a role. The callback receives a `RoleConfig` builder and m
 rbac.withRole("admin", (role) =>
   role
     .findMany("public", "users", { columns: ["id", "email", "name"] })
-    .updateOne("public", "users", { columns: ["email", "name"] })
+    .updateOne("public", "users", { columns: ["email", "name"] }),
 );
 ```
 
@@ -136,16 +136,16 @@ Removes a role from the registry.
 
 Each method takes `(schema: string, table: string, permissions: EntityPermissions)` and returns the builder for chaining.
 
-| Method | Operation |
-|--------|-----------|
-| `.findMany(schema, table, permissions)` | SELECT multiple rows |
-| `.findOne(schema, table, permissions)` | SELECT single row |
-| `.aggregate(schema, table, permissions)` | Aggregate queries |
-| `.createOne(schema, table, permissions)` | INSERT single row |
+| Method                                    | Operation            |
+| ----------------------------------------- | -------------------- |
+| `.findMany(schema, table, permissions)`   | SELECT multiple rows |
+| `.findOne(schema, table, permissions)`    | SELECT single row    |
+| `.aggregate(schema, table, permissions)`  | Aggregate queries    |
+| `.createOne(schema, table, permissions)`  | INSERT single row    |
 | `.createMany(schema, table, permissions)` | INSERT multiple rows |
-| `.updateOne(schema, table, permissions)` | UPDATE single row |
+| `.updateOne(schema, table, permissions)`  | UPDATE single row    |
 | `.updateMany(schema, table, permissions)` | UPDATE multiple rows |
-| `.deleteOne(schema, table, permissions)` | DELETE single row |
+| `.deleteOne(schema, table, permissions)`  | DELETE single row    |
 | `.deleteMany(schema, table, permissions)` | DELETE multiple rows |
 
 ---
@@ -166,13 +166,13 @@ rbac.deleteOneModel({ schema, table, user, query?, connection?, bypass? })
 rbac.deleteManyModel({ schema, table, user, query?, connection?, bypass? })
 ```
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `schema` | `string` | PostgreSQL schema name |
-| `table` | `string` | Table name |
-| `user` | `User` | Authenticated user object with a `roleId` field |
-| `bypass` | `boolean` | Skip all RBAC checks (use for internal/admin operations) |
-| `connection` | any | Optional database connection override |
+| Parameter    | Type      | Description                                              |
+| ------------ | --------- | -------------------------------------------------------- |
+| `schema`     | `string`  | PostgreSQL schema name                                   |
+| `table`      | `string`  | Table name                                               |
+| `user`       | `User`    | Authenticated user object with a `role_id` field         |
+| `bypass`     | `boolean` | Skip all RBAC checks (use for internal/admin operations) |
+| `connection` | any       | Optional database connection override                    |
 
 ---
 
@@ -199,10 +199,10 @@ interface EntityPermissions {
 
 ### Errors
 
-| Class | HTTP Status | Thrown When |
-|-------|-------------|-------------|
-| `ForbiddenError` | 403 | User has no role, role doesn't exist, or role lacks permission for the operation |
-| `BadRequest` | 400 | Query contains columns or conditions the role is not allowed to use |
+| Class            | HTTP Status | Thrown When                                                                      |
+| ---------------- | ----------- | -------------------------------------------------------------------------------- |
+| `ForbiddenError` | 403         | User has no role, role doesn't exist, or role lacks permission for the operation |
+| `BadRequest`     | 400         | Query contains columns or conditions the role is not allowed to use              |
 
 ```typescript
 import { ForbiddenError, BadRequest } from "easy-psql-rbac";
@@ -234,7 +234,7 @@ rbac.withRole("member", (role) =>
       columns: ["owner_id"],
       columnToUserFieldMapper: { owner_id: "userId" },
     },
-  })
+  }),
 );
 ```
 
@@ -247,7 +247,7 @@ rbac.withRole("tenant-user", (role) =>
     preConditions: {
       input: { tenant_id: "fixed-tenant-id" }, // client cannot override this
     },
-  })
+  }),
 );
 ```
 
@@ -260,7 +260,7 @@ rbac.withRole("moderator", (role) =>
     preConditions: {
       where: { status: { _eq: "pending" } },
     },
-  })
+  }),
 );
 ```
 

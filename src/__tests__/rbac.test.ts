@@ -70,7 +70,7 @@ const ROLE = {
   BASE: "base",
 } as const;
 
-const BASE_USER = { id: "user-123", roleId: ROLE.BASE };
+const BASE_USER = { id: "user-123", role_id: ROLE.BASE };
 
 // Full-permissions role used by most tests
 function setupBaseRole(rbac: EasyPSQLRBAC) {
@@ -163,7 +163,7 @@ describe("access control gates", () => {
     setupBaseRole(rbac);
   });
 
-  it("throws ForbiddenError when user has no roleId", () => {
+  it("throws ForbiddenError when user has no role_id", () => {
     expect(() =>
       rbac.findManyModel({
         schema: "public",
@@ -174,12 +174,12 @@ describe("access control gates", () => {
     ).toThrow(ForbiddenError);
   });
 
-  it("throws ForbiddenError when roleId is not registered", () => {
+  it("throws ForbiddenError when role_id is not registered", () => {
     expect(() =>
       rbac.findManyModel({
         schema: "public",
         table: "users",
-        user: { id: "u1", roleId: "unknown" },
+        user: { id: "u1", role_id: "unknown" },
         query: {},
       }),
     ).toThrow(ForbiddenError);
@@ -191,7 +191,7 @@ describe("access control gates", () => {
       rbac.findManyModel({
         schema: "public",
         table: "users",
-        user: { id: "u1", roleId: "no-schema" },
+        user: { id: "u1", role_id: "no-schema" },
         query: {},
       }),
     ).toThrow(ForbiddenError);
@@ -205,7 +205,7 @@ describe("access control gates", () => {
       rbac.findManyModel({
         schema: "public",
         table: "users",
-        user: { id: "u1", roleId: "no-table" },
+        user: { id: "u1", role_id: "no-table" },
         query: {},
       }),
     ).toThrow(ForbiddenError);
@@ -219,7 +219,7 @@ describe("access control gates", () => {
       rbac.findManyModel({
         schema: "public",
         table: "users",
-        user: { id: "u1", roleId: "empty-cols" },
+        user: { id: "u1", role_id: "empty-cols" },
         query: {},
       }),
     ).toThrow(ForbiddenError);
@@ -290,7 +290,7 @@ describe("select sanitization", () => {
     rbac.withRole("r", (r) =>
       r.findMany("public", "users", { columns: ["id", "name"] }),
     );
-    const user = { id: "user-123", roleId: "r" };
+    const user = { id: "user-123", role_id: "r" };
     expect(() =>
       rbac.findManyModel({
         schema: "public",
@@ -323,7 +323,7 @@ describe("select sanitization", () => {
     rbac.findManyModel({
       schema: "public",
       table: "users",
-      user: { id: "u1", roleId: "pc" },
+      user: { id: "u1", role_id: "pc" },
       query,
     });
     expect(query.where).toMatchObject({ name: { _eq: "active" } });
@@ -340,7 +340,7 @@ describe("select sanitization", () => {
     rbac.findManyModel({
       schema: "public",
       table: "users",
-      user: { id: "user-123", roleId: "own" },
+      user: { id: "user-123", role_id: "own" },
       query,
     });
     expect(query.where._and).toContainEqual({ user_id: { _eq: "user-123" } });
@@ -361,7 +361,7 @@ describe("select sanitization", () => {
     rbac.findManyModel({
       schema: "public",
       table: "users",
-      user: { id: "user-123", sub: "sub-abc", roleId: "mapped-sel" },
+      user: { id: "user-123", sub: "sub-abc", role_id: "mapped-sel" },
       query,
     });
     expect(query.where._and).toContainEqual({ user_id: { _eq: "sub-abc" } });
@@ -387,7 +387,7 @@ describe("select sanitization", () => {
     rbac.withRole("r", (r) =>
       r.findMany("public", "users", { columns: ["id", "name"] }),
     );
-    const user = { id: "u1", roleId: "r" };
+    const user = { id: "u1", role_id: "r" };
     expect(() =>
       rbac.findManyModel({
         schema: "public",
@@ -417,7 +417,7 @@ describe("select sanitization", () => {
       rbac.findManyModel({
         schema: "public",
         table: "users",
-        user: { id: "u1", roleId: "r" },
+        user: { id: "u1", role_id: "r" },
         query: { distinct: ["email"] },
       }),
     ).toThrow(ForbiddenError);
@@ -434,7 +434,7 @@ describe("select sanitization", () => {
       rbac.findManyModel({
         schema: "public",
         table: "posts",
-        user: { id: "u1", roleId: "r" },
+        user: { id: "u1", role_id: "r" },
         query: { include: { user: {} } },
       }),
     ).toThrow(ForbiddenError);
@@ -488,7 +488,7 @@ describe("select sanitization", () => {
     rbac.findManyModel({
       schema: "public",
       table: "users",
-      user: { id: "u1", roleId: "r" },
+      user: { id: "u1", role_id: "r" },
       query,
     });
     expect(query.select).toEqual({ id: true, name: true });
@@ -541,7 +541,7 @@ describe("insert sanitization", () => {
     rbac.createOneModel({
       schema: "public",
       table: "users",
-      user: { id: "u1", roleId: "pc" },
+      user: { id: "u1", role_id: "pc" },
       body,
     });
     expect(body.user_id).toBe("forced");
@@ -558,7 +558,7 @@ describe("insert sanitization", () => {
     rbac.createOneModel({
       schema: "public",
       table: "users",
-      user: { id: "user-123", roleId: "own" },
+      user: { id: "user-123", role_id: "own" },
       body,
     });
     expect(body.user_id).toBe("user-123");
@@ -579,12 +579,11 @@ describe("insert sanitization", () => {
     rbac.createOneModel({
       schema: "public",
       table: "users",
-      user: { id: "user-123", sub: "sub-abc", roleId: "mapped-ins" },
+      user: { id: "user-123", sub: "sub-abc", role_id: "mapped-ins" },
       body,
     });
     expect(body.user_id).toBe("sub-abc");
   });
-
 
   it("throws ForbiddenError when any row in createMany contains a disallowed column", () => {
     const body: any = [
@@ -642,7 +641,7 @@ describe("insert sanitization", () => {
       rbac.createOneModel({
         schema: "public",
         table: "users",
-        user: { id: "u1", roleId: "pc" },
+        user: { id: "u1", role_id: "pc" },
         body,
       }),
     ).toThrow(ForbiddenError);
@@ -659,7 +658,7 @@ describe("insert sanitization", () => {
     rbac.createOneModel({
       schema: "public",
       table: "users",
-      user: { id: "u1", roleId: "pc" },
+      user: { id: "u1", role_id: "pc" },
       body,
     });
     expect(body.user_id).toBe("forced");
@@ -696,7 +695,7 @@ describe("insert sanitization", () => {
       rbac.createOneModel({
         schema: "public",
         table: "posts",
-        user: { id: "u1", roleId: "nested" },
+        user: { id: "u1", role_id: "nested" },
         body,
       }),
     ).toThrow(ForbiddenError);
@@ -717,7 +716,7 @@ describe("insert sanitization", () => {
       rbac.createOneModel({
         schema: "public",
         table: "posts",
-        user: { id: "u1", roleId: "nested" },
+        user: { id: "u1", role_id: "nested" },
         body,
       }),
     ).not.toThrow();
@@ -737,7 +736,7 @@ describe("insert sanitization", () => {
     rbac.createManyModel({
       schema: "public",
       table: "users",
-      user: { id: "user-123", roleId: "own" },
+      user: { id: "user-123", role_id: "own" },
       body,
     });
     expect(body[0].user_id).toBe("user-123");
@@ -755,7 +754,7 @@ describe("insert sanitization", () => {
       rbac.createOneModel({
         schema: "public",
         table: "users",
-        user: { id: "u1", roleId: "bad-own" },
+        user: { id: "u1", role_id: "bad-own" },
         body: { name: "A" },
       }),
     ).toThrow(ForbiddenError);
@@ -846,7 +845,7 @@ describe("update sanitization", () => {
       model: (DB as any).models["public"]["users"],
       input,
       apiAccessType: AllowedEngineApiAccessTypes.updateOne,
-      user: { id: "user-123", sub: "sub-abc", roleId: ROLE.BASE },
+      user: { id: "user-123", sub: "sub-abc", role_id: ROLE.BASE },
       entityPermissions: {
         columns: ["name", "email", "user_id"],
         ownership: {
@@ -1095,7 +1094,7 @@ describe("where sanitization", () => {
         model: postsModel as any,
         where: { user: { email: { _eq: "x" } } },
         apiAccessType: AllowedEngineApiAccessTypes.findMany,
-        user: { id: "u1", roleId: "r" },
+        user: { id: "u1", role_id: "r" },
         entityPermissions: EP.postsFull,
       }),
     ).toThrow(ForbiddenError);
@@ -1281,7 +1280,7 @@ describe("preConditions end-to-end", () => {
     rbac.findManyModel({
       schema: "public",
       table: "users",
-      user: { id: "u1", roleId: "pc" },
+      user: { id: "u1", role_id: "pc" },
       query,
     });
     expect(query.where._and).toContainEqual({ active: true });
@@ -1323,7 +1322,7 @@ describe("preConditions end-to-end", () => {
       model: postsModel as any,
       where,
       apiAccessType: AllowedEngineApiAccessTypes.findMany,
-      user: { id: "u1", roleId: "pc" },
+      user: { id: "u1", role_id: "pc" },
       entityPermissions: EP.postsFull,
     });
     expect(where.user).toMatchObject({ active: true });
@@ -1344,11 +1343,11 @@ describe("access type enforcement", () => {
     accessType: string,
     columns = ["id", "name", "email", "user_id"],
   ) {
-    const roleId = `only-${accessType}`;
-    rbac.withRole(roleId, (r) =>
+    const role_id = `only-${accessType}`;
+    rbac.withRole(role_id, (r) =>
       r.addPermission("public", "users", accessType as any, { columns }),
     );
-    return { id: "user-123", roleId };
+    return { id: "user-123", role_id };
   }
 
   it("findOneModel uses findOne — not findMany", () => {
@@ -1518,7 +1517,7 @@ describe("RoleRegistry", () => {
     expect(rbac.findRoleById("tmp")).toBeUndefined();
   });
 
-  it("getRolePermissions throws ForbiddenError for unknown roleId", () => {
+  it("getRolePermissions throws ForbiddenError for unknown role_id", () => {
     const rbac = new EasyPSQLRBAC();
     expect(() => rbac.getRolePermissions("ghost")).toThrow(ForbiddenError);
   });
@@ -1558,7 +1557,7 @@ describe("registry isolation", () => {
     rbac.findManyModel({
       schema: "public",
       table: "users",
-      user: { id: "u1", roleId: "r" },
+      user: { id: "u1", role_id: "r" },
       query,
     });
 

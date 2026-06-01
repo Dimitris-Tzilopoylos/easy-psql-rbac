@@ -19,7 +19,12 @@ class MockPostModel {
   table = "posts";
   columns: Record<string, any> = { id: {}, title: {}, user_id: {} };
   relations: Record<string, any> = {
-    user: { from_column: "user_id", to_table: "users", schema: "public", type: "object" },
+    user: {
+      from_column: "user_id",
+      to_table: "users",
+      schema: "public",
+      type: "object",
+    },
   };
   constructor(_connection?: any) {}
 }
@@ -101,8 +106,12 @@ const rbac = new EasyPSQLRBAC();
 rbac
   .withRole("viewer", (r) =>
     r
-      .findMany("public", "users", { columns: ["id", "name", "email", "user_id"] })
-      .findOne("public", "users", { columns: ["id", "name", "email", "user_id"] }),
+      .findMany("public", "users", {
+        columns: ["id", "name", "email", "user_id"],
+      })
+      .findOne("public", "users", {
+        columns: ["id", "name", "email", "user_id"],
+      }),
   )
   .withRole("author", (r) =>
     r
@@ -143,8 +152,8 @@ rbac
       }),
   );
 
-const viewer = { id: "u1", roleId: "viewer" };
-const author = { id: "u2", roleId: "author" };
+const viewer = { id: "u1", role_id: "viewer" };
+const author = { id: "u2", role_id: "author" };
 const userModel = new MockUserModel() as any;
 
 // Pre-built inputs for non-mutating benchmarks
@@ -178,7 +187,11 @@ printGroup("Permission lookup", [
     rbac.getRolePermissions("viewer");
   }),
   bench("permission traversal (schema → table → op)", () => {
-    rbac.getRolePermissions("viewer").schema("public").table("users").findMany();
+    rbac
+      .getRolePermissions("viewer")
+      .schema("public")
+      .table("users")
+      .findMany();
   }),
   bench("getUserRolePermissionsForEntity", () => {
     rbac.getUserRolePermissionsForEntity({
@@ -277,7 +290,10 @@ printGroup("Update sanitization", [
   bench("ownership + preConditions", () => {
     rbac.roleBasedUpdateSanitization({
       model: userModel,
-      input: { update: { name: "Dana", email: "dana@example.com" }, where: { id: { _eq: "u2" } } },
+      input: {
+        update: { name: "Dana", email: "dana@example.com" },
+        where: { id: { _eq: "u2" } },
+      },
       apiAccessType: AllowedEngineApiAccessTypes.updateOne,
       user: author,
       entityPermissions: {
