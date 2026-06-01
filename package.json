@@ -1,6 +1,6 @@
 {
   "name": "easy-psql-rbac",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Role-based access control layer for easy-psql",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
